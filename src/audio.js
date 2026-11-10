@@ -1,9 +1,21 @@
 // Tiny synth sound effects, no audio files needed.
 let ctx;
 
-function tone(freq, dur, { type = 'square', vol = 0.06, slide = 0, delay = 0 } = {}) {
+// iOS/Android only let audio start inside a user gesture, so unlock on the first touch/click/key.
+export function unlockAudio() {
   try {
     ctx ||= new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state !== 'running') ctx.resume();
+    const src = ctx.createBufferSource();
+    src.buffer = ctx.createBuffer(1, 1, 22050);
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch { /* audio is optional */ }
+}
+
+function tone(freq, dur, { type = 'square', vol = 0.06, slide = 0, delay = 0 } = {}) {
+  try {
+    if (!ctx || ctx.state !== 'running') return;
     const t = ctx.currentTime + delay;
     const osc = ctx.createOscillator(), gain = ctx.createGain();
     osc.type = type;

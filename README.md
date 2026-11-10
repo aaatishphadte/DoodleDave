@@ -17,6 +17,8 @@ Dev shortcut: open `/?level=3` to jump straight to a page.
 
 ## Controls
 
+**Keyboard + mouse**
+
 | Key | Action |
 |-----|--------|
 | WASD / arrows | Move |
@@ -24,7 +26,14 @@ Dev shortcut: open `/?level=3` to jump straight to a page.
 | Shift | Fly with the rocket pencil (needs fuel) |
 | F / click | Shoot ink (after picking up the ink bottle) |
 | Mouse drag / Q, E | Turn the camera; scroll wheel zooms |
+| P / Esc | Pause |
 | R | Restart the page (costs a life) |
+
+**Phones and tablets (iOS / Android)** – the left thumb anywhere on the left side is a floating joystick; dragging on the right side turns the camera. On-screen buttons: **Jump**, **Ink** and **Fly**, which appear once you pick those items up, plus **Pause**. The camera follows behind you automatically. Landscape is best. Tap *Full screen* on Android, or use *Add to Home Screen* on iPhone to play without browser bars.
+
+**Game controllers** (Xbox / PlayStation / Bluetooth pads, Android TV, Fire TV) – left stick or D-pad to move, right stick for the camera, A jump, X / B ink, RT / LT / RB rocket, Start pause. The D-pad and A also work in menus.
+
+**TV remotes** (Android TV, Fire TV, Tizen, webOS) – arrows to move, OK to jump, and holding OK while falling fires the rocket. Ink fires by itself at enemies straight ahead. Back pauses. TV mode is detected automatically; add `?tv` to the URL to force it, or `?touch` to force touch controls.
 
 ## Gameplay
 
@@ -41,11 +50,13 @@ Dev shortcut: open `/?level=3` to jump straight to a page.
 ```
 index.html               page, HUD, start screen
 src/main.js              boot, UI wiring, game loop
+src/input.js             touch controls, gamepads, device detection
 src/game.js              terrain, player, enemies, camera
 src/doodle.js            hand-drawn look: paper textures, ink outlines, shadows
 src/levels.js            level grids (edit these to make new pages)
 src/audio.js             synthesized sound effects
 public/models/           optional GLB model overrides (see README there)
+public/manifest.webmanifest, icons   home-screen install (PWA)
 tools/validate-levels.mjs  level checker
 tools/blender_prep.py      Blender script to prepare Tripo/GLB models
 ```

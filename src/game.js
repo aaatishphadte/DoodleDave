@@ -174,21 +174,78 @@ function makeInkBottle() {
 // ---------- the game ----------
 
 export class Game {
-  constructor(canvas, ui) {
+  constructor(canvas, ui, device = {}) {
     this.ui = ui;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.device = device;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !device.mobile || window.devicePixelRatio < 2, alpha: true, powerPreference: 'high-performance' });
+    // Phones have very dense screens; rendering at full density costs a lot for little gain.
+    this.maxRatio = device.tv ? 1 : device.mobile ? 1.5 : 2;
+    this.pixelRatio = Math.min(window.devicePixelRatio || 1, this.maxRatio);
+    this.renderer.setPixelRatio(this.pixelRatio);
+    this.perf = { t: 0, frames: 0 };
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
     this.mats = terrainMaterials();
     this.models = {};
     this.keys = {};
+    this.virt = { x: 0, z: 0, rocket: false }; // analog input from touch / gamepad
+    this.jumpHeld = false;
+    this.autoCam = !!(device.touch || device.tv);
+    this.lastLook = -10;
     this.state = 'title';
     this.time = 0;
     this.focus = V();
     this.bindInput(canvas);
     this.resize();
     window.addEventListener('resize', () => this.resize());
+    window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 250));
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.state === 'play') this.togglePause();
+    });
+  }
+
+  // ----- shared input actions (keyboard, mouse, touch, gamepad, TV remote) -----
+
+  pressJump() {
+    if (this.state !== 'play') return;
+    this.jumpHeld = true;
+    this.p.buffer = 0.12;
+  }
+
+  releaseJump() {
+    this.jumpHeld = false;
+    if (this.p && this.p.vel.y > 0 && !this.p.rocketing) this.p.vel.y *= 0.5; // short hop
+  }
+
+  look(dYaw, dPitch) {
+    this.yaw -= dYaw;
+    this.pitch = THREE.MathUtils.clamp(this.pitch + dPitch, 0.12, 1.3);
+    this.lastLook = this.time;
+  }
+
+  useAutoCam(on) { this.autoCam = on; }
+
+  clearInput() {
+    this.keys = {};
+    this.virt.x = this.virt.z = 0;
+    this.virt.rocket = false;
+    this.jumpHeld = false;
+    this.touch?.reset();
+  }
+
+  togglePause() {
+    if (this.state === 'play') {
+      this.state = 'pause';
+      this.clearInput();
+      document.exitPointerLock?.();
+      this.ui.showHud(false);
+      this.ui.overlay('Paused', `${this.level.def.name} · Score ${this.score}`, 'Resume', () => this.togglePause(),
+        'Restart page', () => { this.togglePause(); this.kill(true); });
+    } else if (this.state === 'pause') {
+      this.state = 'play';
+      this.ui.overlay(null);
+      this.ui.showHud(true);
+    }
   }
 
   // Optional GLB overrides listed in public/models/manifest.json (see public/models/README.md).
@@ -208,30 +265,43 @@ export class Game {
   }
 
   bindInput(canvas) {
+    // TV remotes send arrows + Enter (OK); Back arrives as Escape / GoBack / BrowserBack / 461 (webOS) / 10009 (Tizen).
+    const isBack = e => ['Escape', 'GoBack', 'BrowserBack', 'Backspace'].includes(e.key) || e.keyCode === 461 || e.keyCode === 10009;
+    const isJump = e => e.code === 'Space' || e.key === 'Enter' || e.code === 'NumpadEnter';
     window.addEventListener('keydown', e => {
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
-      if (this.state !== 'play') { if (e.code === 'Enter') this.ui.button.click(); return; }
-      if (e.code === 'Space' && !e.repeat) this.p.buffer = 0.12;
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) || e.key?.startsWith('Arrow')) e.preventDefault();
+      if (this.state !== 'play') {
+        if (this.state === 'pause' && (isBack(e) || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); this.togglePause(); return; }
+        if (e.key?.startsWith('Arrow')) this.ui.moveFocus(e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1);
+        else if (e.key === 'Enter' && document.activeElement?.tagName !== 'BUTTON') this.ui.activate();
+        return;
+      }
+      if (isBack(e) || e.code === 'KeyP') { e.preventDefault(); if (!e.repeat) this.togglePause(); return; }
+      if (isJump(e)) { e.preventDefault(); if (!e.repeat) this.pressJump(); }
       if ((e.code === 'KeyF' || e.code === 'KeyJ') && !e.repeat) this.shoot();
-      if (e.code === 'KeyR') this.kill(true);
-      this.keys[e.code] = true;
+      if (e.code === 'KeyR' && !e.repeat) this.kill(true);
+      if (e.key?.startsWith('Arrow') && this.device.tv) this.autoCam = true;
+      this.keys[e.code || e.key] = true;
+      if (e.key?.startsWith('Arrow')) this.keys[e.key] = true; // some TV browsers leave e.code empty
     });
     window.addEventListener('keyup', e => {
-      this.keys[e.code] = false;
-      if (e.code === 'Space' && this.p && this.p.vel.y > 0) this.p.vel.y *= 0.5; // short hop
+      this.keys[e.code || e.key] = false;
+      if (e.key?.startsWith('Arrow')) this.keys[e.key] = false;
+      if (isJump(e)) this.releaseJump();
     });
-    window.addEventListener('blur', () => { this.keys = {}; });
+    window.addEventListener('blur', () => this.clearInput());
     let dragging = false;
-    canvas.addEventListener('mousedown', () => {
-      if (this.state !== 'play') return;
+    canvas.addEventListener('pointerdown', e => {
+      if (e.pointerType !== 'mouse' || this.state !== 'play') return;
+      this.autoCam = false;
       if (document.pointerLockElement === canvas) this.shoot();
       else { dragging = true; canvas.requestPointerLock?.(); }
     });
     window.addEventListener('mouseup', () => { dragging = false; });
     window.addEventListener('mousemove', e => {
       if (this.state !== 'play' || !(dragging || document.pointerLockElement === canvas)) return;
-      this.yaw -= e.movementX * 0.004;
-      this.pitch = THREE.MathUtils.clamp(this.pitch + e.movementY * 0.003, 0.12, 1.3);
+      this.autoCam = false;
+      this.look(e.movementX * 0.004, e.movementY * 0.003);
     });
     canvas.addEventListener('wheel', e => { this.dist = THREE.MathUtils.clamp(this.dist + Math.sign(e.deltaY), 6, 18); }, { passive: true });
   }
@@ -240,12 +310,30 @@ export class Game {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
+    // Portrait phones: widen the view so the level isn't a narrow slit.
+    this.camera.fov = w / h < 1 ? 72 : 55;
     this.camera.updateProjectionMatrix();
+  }
+
+  // Drop render resolution if the device can't hold ~45 fps.
+  adaptQuality(dt) {
+    const pf = this.perf;
+    if (this.time < 3) return; // skip start-up shader compiles
+    pf.t += dt; pf.frames++;
+    if (pf.t < 2) return;
+    const fps = pf.frames / pf.t;
+    pf.t = 0; pf.frames = 0;
+    if (fps < 45 && this.pixelRatio > 0.75) {
+      this.pixelRatio = Math.max(0.75, this.pixelRatio - 0.25);
+      this.renderer.setPixelRatio(this.pixelRatio);
+      this.resize();
+    }
   }
 
   // ----- flow -----
 
   newGame(levelIndex = 0) {
+    this.clearInput();
     this.score = 0;
     this.lives = 3;
     this.loadLevel(levelIndex);
@@ -321,6 +409,7 @@ export class Game {
     if (p.dead > 0 || (!force && p.safe > 0)) return;
     p.dead = 0.8;
     sfx.die();
+    navigator.vibrate?.([60, 40, 120]);
     this.burst(p.pos.clone().setY(p.pos.y + 0.8), 0xe8443a);
   }
 
@@ -329,6 +418,7 @@ export class Game {
     this.lives--;
     if (this.lives <= 0) {
       this.state = 'over';
+      this.clearInput();
       this.ui.showHud(false);
       this.ui.overlay('Rubbed out!', `Pip got erased on ${this.level.def.name}. Final score: ${this.score}.`, 'Try again', () => this.newGame(0));
       return;
@@ -347,6 +437,7 @@ export class Game {
     this.score += 1000 + Math.round(this.p.fuel) * 5;
     if (this.index + 1 < LEVELS.length) { this.loadLevel(this.index + 1); return; }
     this.state = 'win';
+    this.clearInput();
     this.ui.showHud(false);
     document.exitPointerLock?.();
     this.ui.overlay('Off the page!', `Pip made it through every page. Final score: ${this.score}.`, 'Play again', () => this.newGame(0));
@@ -390,6 +481,19 @@ export class Game {
     this.level.shots.push({ mesh, vel: V(Math.sin(p.face) * 18, 0, Math.cos(p.face) * 18), life: 1.1 });
   }
 
+  // TV remote has no fire button: ink fires by itself at an enemy straight ahead.
+  autoInk() {
+    const p = this.p;
+    if (!p.ink || p.cool > 0 || p.dead > 0) return;
+    const fx = Math.sin(p.face), fz = Math.cos(p.face);
+    for (const e of this.level.ents) {
+      if (!e.alive || (e.type !== 'eraser' && e.type !== 'fly')) continue;
+      const dx = e.mesh.position.x - p.pos.x, dz = e.mesh.position.z - p.pos.z, d = Math.hypot(dx, dz);
+      const dy = e.mesh.position.y + (e.type === 'eraser' ? 0.4 : 0) - (p.pos.y + 0.85);
+      if (d < 9 && d > 0.5 && Math.abs(dy) < 0.8 && (dx * fx + dz * fz) / d > 0.96) { this.shoot(); return; }
+    }
+  }
+
   burst(at, color, count = 8) {
     for (let i = 0; i < count; i++) {
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.07 + Math.random() * 0.06, 6, 4), new THREE.MeshBasicMaterial({ color }));
@@ -404,9 +508,13 @@ export class Game {
   update(dt) {
     this.time += dt;
     boil.value = Math.floor(this.time * 7);
+    this.pads?.poll(dt);
     if (this.state !== 'play') { if (this.level) this.placeCamera(dt * 2); return; }
+    this.adaptQuality(dt);
     const k = this.keys;
-    this.yaw += ((k.KeyQ ? 1 : 0) - (k.KeyE ? 1 : 0)) * 2.2 * dt;
+    const turn = (k.KeyQ ? 1 : 0) - (k.KeyE ? 1 : 0);
+    if (turn) this.look(-turn * 2.2 * dt, 0);
+    if (this.device.tv) this.autoInk();
 
     for (const pl of this.level.platforms) {
       const t = 0.5 - 0.5 * Math.cos((this.time / pl.period) * Math.PI * 2);
@@ -434,12 +542,20 @@ export class Game {
     p.cool -= dt;
     if (p.plat) p.pos.add(p.plat.delta);
 
-    const ix = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
-    const iz = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0);
+    const ix = THREE.MathUtils.clamp((k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0) + this.virt.x, -1, 1);
+    const iz = THREE.MathUtils.clamp((k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0) + this.virt.z, -1, 1);
     const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
     let mx = -s * iz + c * ix, mz = -c * iz - s * ix;
     const len = Math.hypot(mx, mz);
-    if (len > 0) { mx /= len; mz /= len; p.face = Math.atan2(mx, mz); }
+    if (len > 1) { mx /= len; mz /= len; } // analog sticks keep partial speed
+    if (len > 0.05) p.face = Math.atan2(mx, mz);
+
+    // Auto camera (touch / gamepad / TV): drift behind the player while they run,
+    // unless they've turned the camera themselves in the last moment.
+    if (this.autoCam && len > 0.3 && this.time - this.lastLook > 1.2) {
+      const diff = Math.atan2(Math.sin(p.face + Math.PI - this.yaw), Math.cos(p.face + Math.PI - this.yaw));
+      this.yaw += Math.sin(diff) * Math.min(1, len) * 1.4 * dt; // sin() so running toward the camera doesn't flip it
+    }
     const grip = Math.min(1, (p.ground ? 14 : 6) * dt);
     p.vel.x += (mx * SPEED - p.vel.x) * grip;
     p.vel.z += (mz * SPEED - p.vel.z) * grip;
@@ -450,7 +566,9 @@ export class Game {
       p.vel.y = JUMP; p.buffer = 0; p.coyote = 0; p.ground = false; p.plat = null;
       sfx.jump();
     }
-    const rocketing = (k.ShiftLeft || k.ShiftRight) && p.fuel > 0;
+    // TV remotes have no spare button: holding OK while falling fires the rocket.
+    const remoteRocket = this.device.tv && this.jumpHeld && !p.ground && p.vel.y < 0;
+    const rocketing = p.rocketing = (k.ShiftLeft || k.ShiftRight || this.virt.rocket || remoteRocket) && p.fuel > 0;
     if (rocketing) {
       p.vel.y += (7 - p.vel.y) * Math.min(1, 8 * dt);
       p.fuel = Math.max(0, p.fuel - 14 * dt);

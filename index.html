@@ -2,52 +2,155 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Doodle Dash</title>
+<meta name="description" content="A doodle-styled 3D platformer. Grab the Ink Star, find the door.">
+<meta name="theme-color" content="#f7f3e8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Doodle Dash">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
-  :root { --ink:#1b1b24; --paper:#f7f3e8; --red:#e8443a; }
-  * { box-sizing: border-box; }
-  html, body { margin:0; height:100%; overflow:hidden; }
+  :root {
+    --ink:#1b1b24; --paper:#f7f3e8; --red:#e8443a;
+    --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px);
+    --st: env(safe-area-inset-top, 0px);  --sb: env(safe-area-inset-bottom, 0px);
+    --hud-left: 96px; --hud-font: 20px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; height:100%; overflow:hidden; overscroll-behavior:none; }
   body {
-    font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive;
+    position:fixed; inset:0;
+    font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", "Comic Neue", cursive;
     color: var(--ink);
     background-color: var(--paper);
     background-image:
       linear-gradient(90deg, transparent 78px, #eba3a3 78px, #eba3a3 80px, transparent 80px),
       repeating-linear-gradient(transparent 0 31px, #b7d0ea 31px 32px);
-    user-select: none;
+    user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+    touch-action:none; -webkit-text-size-adjust:100%;
   }
-  canvas#game { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  canvas#game { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+  /* ---------- HUD ---------- */
   #hud {
-    position:fixed; top:10px; left:96px; right:16px; display:flex; gap:22px; align-items:center;
-    font-size:20px; font-weight:bold; pointer-events:none; flex-wrap:wrap;
+    position:fixed; top:calc(10px + var(--st)); left:calc(var(--hud-left) + var(--sl)); right:calc(16px + var(--sr));
+    display:flex; gap:clamp(8px,2vw,22px); align-items:center;
+    font-size:var(--hud-font); font-weight:bold; pointer-events:none; flex-wrap:wrap;
   }
-  #hud .chip { background:#fffdf6; border:3px solid var(--ink); border-radius:14px 18px 12px 20px; padding:2px 12px; transform:rotate(-1deg); }
+  #hud .chip { background:#fffdf6; border:3px solid var(--ink); border-radius:14px 18px 12px 20px; padding:2px 12px; transform:rotate(-1deg); white-space:nowrap; }
   #hud .chip:nth-child(even) { transform:rotate(1.2deg); }
   #lives { color: var(--red); letter-spacing:2px; }
   #fuelwrap { display:none; align-items:center; gap:8px; }
   #fuelbar { width:110px; height:14px; border:3px solid var(--ink); border-radius:8px; overflow:hidden; background:#fff; }
   #fuel { height:100%; width:0%; background:repeating-linear-gradient(45deg,#ffd23f 0 6px,#ffb400 6px 12px); }
-  #help { position:fixed; bottom:8px; left:96px; right:16px; font-size:14px; opacity:.75; pointer-events:none; }
+  #help { position:fixed; bottom:calc(8px + var(--sb)); left:calc(var(--hud-left) + var(--sl)); right:16px; font-size:14px; opacity:.75; pointer-events:none; }
+  #help .tv, #help .touch { display:none; }
   #banner {
-    position:fixed; top:22%; left:0; right:0; text-align:center; font-size:44px; font-weight:bold;
+    position:fixed; top:22%; left:16px; right:16px; text-align:center; font-size:clamp(26px,5vw,44px); font-weight:bold;
     pointer-events:none; opacity:0; transition:opacity .4s; text-shadow:3px 3px 0 #fffdf6;
   }
-  #banner small { display:block; font-size:20px; font-weight:normal; }
+  #banner small { display:block; font-size:clamp(15px,2.4vw,20px); font-weight:normal; }
+
+  /* ---------- overlay / menus ---------- */
   #overlay {
     position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:rgba(247,243,232,.88); text-align:center; padding:24px;
+    background:rgba(247,243,232,.9); text-align:center;
+    padding:calc(16px + var(--st)) calc(20px + var(--sr)) calc(16px + var(--sb)) calc(20px + var(--sl));
+    overflow-y:auto; touch-action:pan-y; z-index:20;
   }
-  #overlay h1 { font-size:clamp(40px,8vw,84px); margin:0; transform:rotate(-2deg); text-shadow:4px 4px 0 #ffd23f; }
-  #overlay p { font-size:20px; max-width:620px; line-height:1.5; }
+  #overlay h1 { font-size:clamp(36px,8vw,84px); margin:0; transform:rotate(-2deg); text-shadow:4px 4px 0 #ffd23f; }
+  #overlay p { font-size:clamp(16px,2.6vw,20px); max-width:620px; line-height:1.5; }
+  #ov-buttons { display:flex; gap:18px; flex-wrap:wrap; justify-content:center; }
   #overlay button {
-    font:inherit; font-size:26px; font-weight:bold; padding:8px 30px; cursor:pointer; color:var(--ink);
+    font:inherit; font-size:clamp(20px,3.4vw,26px); font-weight:bold; padding:10px 30px; min-height:56px; cursor:pointer; color:var(--ink);
     background:#ffd23f; border:4px solid var(--ink); border-radius:18px 26px 16px 28px; box-shadow:5px 5px 0 var(--ink);
+    touch-action:manipulation;
   }
+  #overlay button.alt { background:#fffdf6; }
   #overlay button:active { transform:translate(3px,3px); box-shadow:2px 2px 0 var(--ink); }
+  #overlay button:focus-visible, #overlay button.focus { outline:5px dashed var(--red); outline-offset:6px; }
   #credits { margin-top:28px; font-size:16px; opacity:.8; }
   #credits a { color:var(--ink); font-weight:bold; text-decoration:underline wavy #e8443a; }
+  #device-tip { font-size:15px; opacity:.75; margin-top:14px; }
   .hidden { display:none !important; }
+
+  /* ---------- touch controls ---------- */
+  #touch { position:fixed; inset:0; pointer-events:none; display:none; z-index:10; }
+  body.touch.playing #touch { display:block; }
+  .tbtn {
+    position:absolute; pointer-events:auto; touch-action:none;
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    font:inherit; font-weight:bold; color:var(--ink); line-height:1;
+    background:rgba(255,253,246,.82); border:4px solid var(--ink); border-radius:50% 46% 52% 48%;
+    box-shadow:4px 4px 0 rgba(27,27,36,.85);
+  }
+  .tbtn small { font-size:12px; margin-top:2px; }
+  .tbtn.down { transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); background:#ffd23f; }
+  #t-jump { width:96px; height:96px; font-size:34px; right:calc(22px + var(--sr)); bottom:calc(26px + var(--sb)); background:rgba(255,210,63,.88); }
+  #t-ink { width:70px; height:70px; font-size:26px; right:calc(132px + var(--sr)); bottom:calc(26px + var(--sb)); }
+  #t-rocket { width:70px; height:70px; font-size:26px; right:calc(36px + var(--sr)); bottom:calc(136px + var(--sb)); }
+  #t-pause { width:48px; height:48px; font-size:20px; right:calc(14px + var(--sr)); top:calc(12px + var(--st)); border-radius:14px; }
+  #t-ink.off, #t-rocket.off { display:none; }
+  #t-stick {
+    position:absolute; width:124px; height:124px; margin:0; transform:translate(-50%,-50%);
+    border:4px dashed rgba(27,27,36,.7); border-radius:50%; background:rgba(255,253,246,.35);
+    left:calc(110px + var(--sl)); bottom:auto; top:calc(100% - 110px - var(--sb)); opacity:.45; pointer-events:none;
+  }
+  #t-stick.on { opacity:1; }
+  #t-knob {
+    position:absolute; left:50%; top:50%; width:58px; height:58px; transform:translate(-50%,-50%);
+    background:#fffdf6; border:4px solid var(--ink); border-radius:50%; box-shadow:3px 3px 0 var(--ink);
+  }
+  #t-hint { position:absolute; left:calc(40px + var(--sl)); bottom:calc(14px + var(--sb)); font-size:13px; opacity:.6; }
+  body.touch #help .keys { display:none; }
+  body.touch #help { display:none; }
+  body.touch.playing #hud { right:calc(74px + var(--sr)); }
+
+  #rotate {
+    position:fixed; left:50%; top:calc(70px + var(--st)); transform:translateX(-50%) rotate(-1deg);
+    background:#fffdf6; border:3px solid var(--ink); border-radius:12px; padding:4px 12px; font-size:14px;
+    pointer-events:none; display:none; z-index:11; white-space:nowrap;
+  }
+  @media (orientation: portrait) { body.touch.playing.phone #rotate { display:block; } }
+
+  /* phones / small screens */
+  @media (max-width: 760px), (max-height: 480px) {
+    :root { --hud-left: 16px; --hud-font: 14px; }
+    body { background-image: repeating-linear-gradient(transparent 0 31px, #b7d0ea 31px 32px); }
+    #hud .chip { border-width:2px; padding:1px 8px; }
+    #fuelbar { width:70px; }
+    #overlay p { margin:10px 0; }
+    #credits { margin-top:14px; font-size:13px; }
+  }
+  @media (max-height: 420px) {
+    #t-jump { width:84px; height:84px; bottom:calc(16px + var(--sb)); }
+    #t-ink { right:calc(118px + var(--sr)); bottom:calc(16px + var(--sb)); width:62px; height:62px; }
+    #t-rocket { bottom:calc(112px + var(--sb)); width:62px; height:62px; }
+    #overlay h1 { font-size:40px; }
+  }
+  /* tablets: bigger thumbs, bigger buttons */
+  @media (min-width: 900px) and (min-height: 600px) {
+    body.touch #t-jump { width:116px; height:116px; font-size:40px; right:calc(40px + var(--sr)); bottom:calc(40px + var(--sb)); }
+    body.touch #t-ink { width:84px; height:84px; right:calc(172px + var(--sr)); bottom:calc(46px + var(--sb)); }
+    body.touch #t-rocket { width:84px; height:84px; right:calc(56px + var(--sr)); bottom:calc(176px + var(--sb)); }
+  }
+
+  /* TV: 10-foot UI, keep everything inside the overscan-safe 5% */
+  body.tv { --hud-left: 5vw; --hud-font: clamp(20px,2.2vw,34px); }
+  body.tv #hud { top:4vh; right:5vw; }
+  body.tv #help { left:5vw; bottom:4vh; font-size:clamp(16px,1.6vw,24px); }
+  body.tv #help .keys { display:none; }
+  body.tv #help .tv { display:inline; }
+  body.tv #overlay p { font-size:clamp(20px,2.2vw,32px); max-width:60vw; }
+  body.tv #overlay button { font-size:clamp(24px,2.6vw,40px); padding:14px 44px; }
+  body.tv #credits { font-size:clamp(16px,1.5vw,24px); }
+
+  @media (prefers-reduced-motion: reduce) { #banner { transition:none; } }
 </style>
 </head>
 <body>
@@ -61,13 +164,31 @@
   <span class="chip" id="ink" style="display:none">✒ ink ready</span>
   <span class="chip" id="fuelwrap">🚀 <span id="fuelbar"><span id="fuel" style="display:block"></span></span></span>
 </div>
-<div id="help" class="hidden">WASD / arrows: move · Space: jump · Shift: rocket pencil · F or click: shoot ink · Mouse or Q/E: turn camera · R: restart page</div>
+<div id="help" class="hidden">
+  <span class="keys">WASD / arrows: move · Space: jump · Shift: rocket pencil · F or click: shoot ink · Mouse or Q/E: turn camera · P/Esc: pause · R: restart page</span>
+  <span class="tv">◀ ▲ ▼ ▶ move · OK jump (hold while falling = rocket) · ink fires by itself · Back: pause</span>
+</div>
 <div id="banner"></div>
+<div id="rotate">↻ Turn sideways for a bigger view</div>
+
+<div id="touch" aria-hidden="true">
+  <div id="t-stick"><div id="t-knob"></div></div>
+  <div id="t-hint">drag left: move · drag right: look</div>
+  <button class="tbtn" id="t-jump">⤒<small>JUMP</small></button>
+  <button class="tbtn off" id="t-ink">✒<small>INK</small></button>
+  <button class="tbtn off" id="t-rocket">🚀<small>FLY</small></button>
+  <button class="tbtn" id="t-pause" aria-label="Pause">❚❚</button>
+</div>
 
 <div id="overlay">
   <h1 id="ov-title">Doodle Dash</h1>
   <p id="ov-text">Pip is a doodle who wants off the page. On every page, grab the <b>Ink Star</b>, then run for the <b>door</b>. Mind the pencil spikes, the grumpy erasers and the scribble-flies.</p>
-  <button id="ov-btn">Start drawing</button>
+  <div id="ov-buttons">
+    <button id="ov-btn">Start drawing</button>
+    <button id="ov-btn2" class="alt hidden"></button>
+    <button id="ov-fs" class="alt hidden">⛶ Full screen</button>
+  </div>
+  <div id="device-tip"></div>
   <div id="credits">
     Designed by <a href="https://booleanchitra.dattatrayfadte.workers.dev" target="_blank" rel="noopener">BooleanChitra</a>
     · Developed by DataTree Studios
