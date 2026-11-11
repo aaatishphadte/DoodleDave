@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Doodle Dash">
 <meta name="format-detection" content="telephone=no">
-<link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" href="/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root {
     --ink:#1b1b24; --paper:#f7f3e8; --red:#e8443a;
@@ -150,25 +150,96 @@
   body.tv #overlay button { font-size:clamp(24px,2.6vw,40px); padding:14px 44px; }
   body.tv #credits { font-size:clamp(16px,1.5vw,24px); }
 
-  @media (prefers-reduced-motion: reduce) { #banner { transition:none; } }
+
+  /* ---------- juice ---------- */
+  #banner { transform:translateY(-10px) scale(.92) rotate(-1.5deg); transition:opacity .35s, transform .45s cubic-bezier(.34,1.56,.64,1); }
+  #banner.show { opacity:1; transform:none; }
+  #pops { position:fixed; inset:0; pointer-events:none; z-index:5; overflow:hidden; }
+  .pop {
+    position:absolute; transform:translate(-50%,-50%); font-weight:bold; font-size:clamp(18px,2.6vw,26px); color:var(--ink);
+    text-shadow:2px 2px 0 #fffdf6, -2px -2px 0 #fffdf6, 2px -2px 0 #fffdf6, -2px 2px 0 #fffdf6; white-space:nowrap;
+    animation:pop .9s cubic-bezier(.2,.8,.3,1) forwards;
+  }
+  .pop.gem { color:#1f7fb8; }
+  .pop.big { font-size:clamp(24px,3.6vw,38px); color:var(--red); animation-duration:1.3s; }
+  @keyframes pop {
+    0% { opacity:0; transform:translate(-50%,-30%) scale(.4) rotate(-6deg); }
+    18% { opacity:1; transform:translate(-50%,-80%) scale(1.25) rotate(3deg); }
+    35% { transform:translate(-50%,-100%) scale(1) rotate(-1deg); }
+    100% { opacity:0; transform:translate(-50%,-230%) scale(.9); }
+  }
+  .bump { animation:bump .35s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes bump { 0% { transform:scale(1.35) rotate(-3deg); } 100% { transform:scale(1) rotate(-1deg); } }
+  #hud .chip.done { background:#ffe98a; }
+  #fuel.low { animation:blink .4s steps(2) infinite; }
+  @keyframes blink { 50% { opacity:.35; } }
+  #wipe {
+    position:fixed; inset:0; pointer-events:none; z-index:15; opacity:0;
+    background-color:var(--paper);
+    background-image:repeating-linear-gradient(transparent 0 31px, #b7d0ea 31px 32px);
+    box-shadow:-12px 0 0 rgba(27,27,36,.25);
+  }
+  #wipe.go { animation:wipe .75s cubic-bezier(.65,0,.35,1) forwards; }
+  @keyframes wipe {
+    0% { opacity:1; transform:translateX(0) rotate(0); }
+    100% { opacity:1; transform:translateX(-115%) rotate(-6deg); transform-origin:bottom left; }
+  }
+
+  /* ---------- menus ---------- */
+  #overlay h1 { animation:titlein .5s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes titlein { from { transform:rotate(-6deg) scale(.7); opacity:0; } }
+  #ov-buttons { max-width:760px; }
+  #overlay button.wide { min-width:min(560px, 86vw); text-align:left; font-size:clamp(17px,2.6vw,22px); }
+  #overlay button:disabled { opacity:.45; cursor:default; box-shadow:2px 2px 0 var(--ink); }
+  #overlay button:not(:disabled):hover { transform:translate(-1px,-2px) rotate(-.6deg); box-shadow:7px 7px 0 var(--ink); }
+  body.home #overlay { background:radial-gradient(ellipse at center, rgba(247,243,232,.92) 0 38%, rgba(247,243,232,.55) 75%); }
+  #overlay:has(.results) h1 { font-size:clamp(30px,6vw,58px); }
+  #overlay:has(.results) { justify-content:flex-start; padding-top:calc(10px + var(--st)); }
+  @media (min-height: 700px) { #overlay:has(.results) { justify-content:center; } }
+  #credits, #device-tip { display:none; }
+  body.home #credits, body.home #device-tip { display:block; }
+  #loading { font-size:20px; margin:18px; animation:blink 1s steps(2) infinite; }
+  .tally { font-weight:bold; font-size:18px; margin:-4px 0 14px; }
+  .results { background:#fffdf6; border:4px solid var(--ink); border-radius:18px 24px 14px 26px; padding:14px 22px 16px; margin:8px 0 18px; box-shadow:6px 6px 0 var(--ink); transform:rotate(-.6deg); min-width:min(440px,90vw); }
+  .rstars { display:flex; justify-content:center; gap:clamp(12px,4vw,34px); margin-bottom:8px; }
+  .rstar { display:flex; flex-direction:column; align-items:center; opacity:0; animation:starin .45s cubic-bezier(.34,1.56,.64,1) forwards; }
+  .rstar b { font-size:clamp(44px,7vw,64px); line-height:1; color:#c9c6bc; }
+  .rstar.on b { color:#ffbf1f; text-shadow:3px 3px 0 var(--ink); }
+  .rstar small { font-size:13px; opacity:.8; }
+  @keyframes starin { from { opacity:0; transform:scale(.2) rotate(-40deg); } to { opacity:1; transform:none; } }
+  .results dl { display:grid; grid-template-columns:auto auto; gap:2px 22px; margin:6px 0; font-size:clamp(15px,2.2vw,18px); text-align:left; }
+  .results dt { opacity:.8; } .results dd { margin:0; text-align:right; font-weight:bold; }
+  .rtotal { font-size:clamp(20px,3vw,26px); font-weight:bold; margin-top:6px; }
+  @media (max-height: 520px) { .results { padding:8px 16px; margin:4px 0 10px; } .rstar b { font-size:38px; } .results dl { font-size:14px; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    #banner { transition:none; transform:none; }
+    .pop { animation-duration:.6s; }
+    #wipe.go { animation:none; }
+    #overlay h1, .rstar, .bump { animation:none; opacity:1; }
+  }
+
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 
 <div id="hud" class="hidden">
-  <span class="chip">Score <span id="score">0</span></span>
+  <span class="chip" id="score-chip">Score <span id="score">0</span></span>
   <span class="chip" id="lvl">Page 1</span>
   <span class="chip" id="lives">♥♥♥</span>
+  <span class="chip" id="gems">◆ 0/0</span>
   <span class="chip" id="star">☆ find the Ink Star</span>
   <span class="chip" id="ink" style="display:none">✒ ink ready</span>
   <span class="chip" id="fuelwrap">🚀 <span id="fuelbar"><span id="fuel" style="display:block"></span></span></span>
 </div>
 <div id="help" class="hidden">
-  <span class="keys">WASD / arrows: move · Space: jump · Shift: rocket pencil · F or click: shoot ink · Mouse or Q/E: turn camera · P/Esc: pause · R: restart page</span>
+  <span class="keys">WASD / arrows: move · Space: jump (land on enemies to stomp) · Shift: rocket pencil · F or click: shoot ink · Mouse or Q/E: turn camera · P/Esc: pause · R: restart page</span>
   <span class="tv">◀ ▲ ▼ ▶ move · OK jump (hold while falling = rocket) · ink fires by itself · Back: pause</span>
 </div>
 <div id="banner"></div>
+<div id="pops" aria-hidden="true"></div>
+<div id="wipe" aria-hidden="true"></div>
 <div id="rotate">↻ Turn sideways for a bigger view</div>
 
 <div id="touch" aria-hidden="true">
@@ -182,10 +253,10 @@
 
 <div id="overlay">
   <h1 id="ov-title">Doodle Dash</h1>
-  <p id="ov-text">Pip is a doodle who wants off the page. On every page, grab the <b>Ink Star</b>, then run for the <b>door</b>. Mind the pencil spikes, the grumpy erasers and the scribble-flies.</p>
+  <p id="ov-text">Pip is a doodle who wants off the page.</p>
+  <div id="ov-extra"></div>
+  <div id="loading">sharpening pencils…</div>
   <div id="ov-buttons">
-    <button id="ov-btn">Start drawing</button>
-    <button id="ov-btn2" class="alt hidden"></button>
     <button id="ov-fs" class="alt hidden">⛶ Full screen</button>
   </div>
   <div id="device-tip"></div>
@@ -195,6 +266,6 @@
   </div>
 </div>
 
-<script type="module" src="/src/main.js"></script>
+<script type="module" src="./src/main.js"></script>
 </body>
 </html>

@@ -4,7 +4,8 @@
 //      P start   S ink star (needed to open the door)   E exit door
 //      o gem     ^ pencil spikes
 //      m eraser patrolling along x     M eraser patrolling along z     b scribble-fly
-//      R rocket pencil (fuel)          I ink shooter
+//      R rocket pencil (fuel)          I ink shooter   C checkpoint flag
+// par: target seconds for the third star.
 // platforms: { from:[cx, y, cz], to:[cx, y, cz], period } - slabs that glide back and forth.
 // Run `npm run validate` after editing to check grids and reachability.
 
@@ -12,6 +13,7 @@ export const LEVELS = [
   {
     name: 'Page 1 — The Margin',
     hint: 'Grab the star on the hill, then find the door.',
+    par: 25,
     colors: [0xbfe3b4, 0xf6e7a1],
     h: [
       '1111111111111111',
@@ -38,6 +40,7 @@ export const LEVELS = [
   {
     name: 'Page 2 — Torn Strips',
     hint: 'Jump the gaps. The ink bottle lets you shoot (F).',
+    par: 35,
     colors: [0xa9d6f5, 0xd9c2f0],
     h: [
       '222222.111.2222.33',
@@ -62,6 +65,7 @@ export const LEVELS = [
   {
     name: 'Page 3 — Sliding Notes',
     hint: 'Ride the yellow sticky notes. Shift fires the rocket pencil.',
+    par: 50,
     colors: [0xf7c6a3, 0xf9e79f],
     h: [
       '1111.....4444444',
@@ -77,7 +81,7 @@ export const LEVELS = [
     ],
     o: [
       '..o..........R..',
-      '...........o....',
+      '...........oC...',
       '................',
       '..........o...S.',
       'P....o.......m..',
@@ -95,6 +99,7 @@ export const LEVELS = [
   {
     name: 'Page 4 — The Long Climb',
     hint: 'Star up top, door at the far tower. Plan the trip.',
+    par: 70,
     colors: [0xb8e0d2, 0xeac4d5],
     h: [
       '2222..3333..5555....',
@@ -111,7 +116,7 @@ export const LEVELS = [
     o: [
       '......o........S....',
       'P......m......b....E',
-      '.o..........o.......',
+      '.o..........o.C.....',
       '..................o.',
       '..I...^.....o.......',
       '.....M..............',
@@ -129,6 +134,7 @@ export const LEVELS = [
   {
     name: 'Page 5 — Last Page',
     hint: 'Up the steps, out to the star, then all the way to the top.',
+    par: 80,
     colors: [0xf4b6c2, 0xb5d8f7],
     h: [
       '111.222.333.444.555...',
@@ -146,7 +152,7 @@ export const LEVELS = [
       'P...I....M...o...o....',
       '.o....^.....b.........',
       '................^....o',
-      '.................o..bS',
+      '.................oC.bS',
       '................o....o',
       'E.....m...^..o...R....',
       '.o..b....M....m.......',

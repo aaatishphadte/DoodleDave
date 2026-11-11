@@ -118,7 +118,17 @@ export class Gamepads {
     this.prev = [];
     this.navCool = 0;
     this.active = false;
+    this.enabled = true;
     window.addEventListener('gamepadconnected', () => { this.active = true; ui.banner('Controller connected', 'A jump · X ink · RT rocket · Start pause'); });
+  }
+
+  // Dual-motor rumble where the browser supports it (Chrome/Edge; silently ignored elsewhere).
+  rumble(strong = 0.5, weak = 0.5, ms = 120) {
+    if (!this.active || !this.enabled || !navigator.getGamepads) return;
+    try {
+      const pad = [...navigator.getGamepads()].find(p => p && p.connected);
+      pad?.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak })?.catch?.(() => {});
+    } catch { /* no haptics */ }
   }
 
   poll(dt) {
@@ -151,6 +161,7 @@ export class Gamepads {
       if (dir && this.navCool <= 0) { this.ui.moveFocus(dir); this.navCool = 0.25; }
       if (!dir) this.navCool = 0;
       if (pressed(0) || pressed(9)) this.ui.activate();
+      if (pressed(1)) this.ui.back();
     }
     this.prev = pad.buttons.map((_, i) => b(i));
   }
