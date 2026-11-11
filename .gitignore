@@ -2,3 +2,5 @@ node_modules
 dist
 build
 release
+social-assets/captions.srt
+/social-assets
